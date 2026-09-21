@@ -174,10 +174,7 @@ void NoteSprite::drawFrame(int frameIndex, float drawX, float drawY, float drawS
     
     SDL_SetTextureAlphaMod(texture, static_cast<Uint8>(alpha * 255.0f));
     
-    SDL_RendererFlip flip = SDL_FLIP_NONE;
-    if (flipY) {
-        flip = SDL_FLIP_VERTICAL;
-    }
+    SDL_RendererFlip flip = GameConfig::getInstance()->isDownscroll() ? SDL_FLIP_VERTICAL : SDL_FLIP_NONE;
     
     SDL_RenderCopyExF(flixel::FlxG::renderer, texture, &srcRect, &destRectF, 0.0f, nullptr, flip);
 }
@@ -296,7 +293,7 @@ void NoteSprite::update(float elapsed) {
     setPosition(x, newY);
     visible = true;
     
-    flipY = GameConfig::getInstance()->isDownscroll();
+    flipY = false;
 
     if (mustPress) {
         if (strumTime > songPos - Conductor::safeZoneOffset &&
