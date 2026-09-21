@@ -35,6 +35,7 @@
 #include <flixel/text/FlxText.h>
 #include <flixel/sound/FlxSound.h>
 #include <flixel/FlxCamera.h>
+#include <flixel/tweens/FlxTween.h>
 
 class PlayState : public FunkinState {
 public:
@@ -51,6 +52,9 @@ public:
     static int campaignScore;
     static std::vector<CachedNoteData> cachedNoteData;
     static std::string cachedSongName;
+    static float baseScrollSpeed;
+    static float playerScrollSpeed;
+    static float opponentScrollSpeed;
 
     PlayState();
     ~PlayState() override;
@@ -66,6 +70,7 @@ public:
     void restartSong();
     void updateCameraZoom();
     void setupHUDCamera();
+    void stepHit() override;
     void beatHit();
     
     flixel::FlxObject* getCamFollow() const { 
@@ -81,8 +86,16 @@ public:
     flixel::FlxCamera* getCamGame() const { return camGame; }
     flixel::FlxCamera* getCamHUD() const { return camHUD; }
     CameraManager* getCameraManager() const { return cameraManager; }
+    Stage* getStage() const { return stage; }
+    Strumline* getPlayerStrumline() const { return playerStrumline; }
+    Strumline* getOpponentStrumline() const { return opponentStrumline; }
     int getCurBeat() const { return curBeat; }
     int getCurStep() const { return curStep; }
+    bool setTargetBopSpeed(const std::string& target, float rate);
+    void tweenScrollSpeed(float scroll, float durationSeconds,
+                          flixel::tweens::EaseFunction ease,
+                          const std::vector<std::string>& strumlines);
+    static float getScrollSpeedForMustPress(bool mustPress);
     
     bool persistentUpdate;
     bool persistentDraw;

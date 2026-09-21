@@ -19,4 +19,6 @@ private:
     void handlePlayAnimation(const SongEvent& e);
     void handleSetCameraBop(const SongEvent& e);
     void handleScrollSpeed(const SongEvent& e);
+    void handleSetHealthIcon(const SongEvent& e);
+    void handleSetTargetBopSpeed(const SongEvent& e);
 };

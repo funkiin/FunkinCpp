@@ -9,6 +9,7 @@ public:
     
     void update(float elapsed);
     void beatHit(int curBeat, int curStep, const SwagSong& song);
+    bool setDanceEvery(const std::string& target, float rate);
     
 private:
     Character* gf;

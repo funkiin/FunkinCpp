@@ -21,7 +21,7 @@ public:
 
     void updateBeat();
     void updateCurStep();
-    void stepHit();
+    virtual void stepHit();
     virtual void beatHit();
     
     void startTransitionIn(float duration = 0.5f, flixel::util::FlxColor color = flixel::util::FlxColor::BLACK, 

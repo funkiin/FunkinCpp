@@ -47,7 +47,7 @@ void NoteUpdateHandler::updateNotes(float elapsed, Character* boyfriend, flixel:
             
             float holdVisualLength = 0.0f;
             if (note->sustainLength > 0) {
-                float scrollSpeed = PlayState::SONG.speed;
+                float scrollSpeed = PlayState::getScrollSpeedForMustPress(note->mustPress);
                 holdVisualLength = note->sustainLength * 0.45f * scrollSpeed;
             }
             

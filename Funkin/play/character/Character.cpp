@@ -15,6 +15,7 @@ Character::Character(float x, float y, const std::string& character, bool isPlay
     , debugMode(false)
     , stunned(false)
     , holdTimer(0.0f)
+    , danceEvery(1.0f)
     , danced(false)
     , healthColorR(255)
     , healthColorG(255)

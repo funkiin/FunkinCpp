@@ -13,6 +13,7 @@ public:
     std::string current;
     int currentFrame = 0;
     float timer = 0.0f;
+    bool reversed = false;
     
     std::function<void(const std::string&)> finishCallback;
     std::function<void(const std::string&, int, int)> frameCallback;
@@ -20,6 +21,7 @@ public:
     void addByPrefix(const std::string& name, const std::vector<int>& frames, int frameRate, bool looped);
     void addByIndices(const std::string& name, const std::vector<int>& sourceFrames, const std::vector<int>& indices, int frameRate, bool looped);
     void play(const std::string& name, bool force = false, int startFrame = 0);
+    void play(const std::string& name, bool force, bool reversed, int startFrame);
     void update(float elapsed);
     
     inline int getCurrentFrame() const {

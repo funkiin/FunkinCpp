@@ -17,11 +17,13 @@ public:
     void makeGraphic(int width, int height, SDL_Color color);
 
     inline void setScale(float x, float y) {
+        scale.set(x, y);
         scaleX = x;
         scaleY = y;
     }
     
     inline void setScale(float scale) {
+        this->scale.set(scale, scale);
         scaleX = scale;
         scaleY = scale;
     }

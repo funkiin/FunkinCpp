@@ -11,6 +11,7 @@
 #include <flixel/FlxG.h>
 #include <flixel/FlxGame.h>
 #include <flixel/math/FlxMath.h>
+#include <flixel/tweens/FlxTween.h>
 #include "../ui/StoryMenuState.h"
 #include "../ui/NewFreeplayState.h"
 
@@ -27,6 +28,9 @@ int PlayState::storyWeek = 0;
 int PlayState::campaignScore = 0;
 std::vector<CachedNoteData> PlayState::cachedNoteData;
 std::string PlayState::cachedSongName;
+float PlayState::baseScrollSpeed = 1.0f;
+float PlayState::playerScrollSpeed = 1.0f;
+float PlayState::opponentScrollSpeed = 1.0f;
 
 const char* PlayState::NOTE_STYLES[] = {"purple", "blue", "green", "red"};
 const char* PlayState::NOTE_DIRS[] = {"LEFT", "DOWN", "UP", "RIGHT"};
@@ -223,6 +227,9 @@ void PlayState::create() {
     
     Conductor::mapBPMChanges(SONG);
     Conductor::changeBPM(SONG.bpm);
+    baseScrollSpeed = SONG.speed;
+    playerScrollSpeed = baseScrollSpeed;
+    opponentScrollSpeed = baseScrollSpeed;
     
     std::string stageName = SONG.stage;
     if (stageName.empty()) {
@@ -352,6 +359,9 @@ void PlayState::update(float elapsed) {
         }
         if (camHUD) {
             camHUD->update(elapsed);
+        }
+        if (stage) {
+            stage->update(elapsed);
         }
         
         if (inst) {
@@ -580,6 +590,8 @@ void PlayState::restartSong() {
     Conductor::songPosition = 0;
     curStep = 0;
     curBeat = 0;
+    playerScrollSpeed = baseScrollSpeed;
+    opponentScrollSpeed = baseScrollSpeed;
     startingSong = true;
     startedCountdown = false;
     musicStartTicks = 0;
@@ -657,6 +669,61 @@ void PlayState::setupHUDCamera() {
     }
 }
 
+void PlayState::stepHit() {
+    ScriptManager::getInstance()->callAll(ScriptCallback::ON_STEP_HIT, {curStep});
+
+    if (stage) {
+        stage->stepHit(curStep);
+    }
+
+    if (curStep % 4 == 0) {
+        beatHit();
+    }
+}
+
+bool PlayState::setTargetBopSpeed(const std::string& target, float rate) {
+    if (characterManager && characterManager->setDanceEvery(target, rate)) {
+        return true;
+    }
+    return stage && stage->setNamedPropDanceEvery(target, rate);
+}
+
+void PlayState::tweenScrollSpeed(float scroll, float durationSeconds,
+                                 flixel::tweens::EaseFunction ease,
+                                 const std::vector<std::string>& strumlines) {
+    auto applySpeed = [&](float* target) {
+        if (!target) return;
+        flixel::tweens::cancelTweensOf(target);
+        if (durationSeconds <= 0.0f) {
+            *target = scroll;
+            return;
+        }
+
+        auto* tween = new flixel::tweens::VarTween(durationSeconds);
+        tween->object = target;
+        tween->ease = ease ? ease : flixel::tweens::FlxEase::linear;
+        tween->addProperty("scrollSpeed", target, scroll);
+        tween->start();
+
+        if (!flixel::tweens::globalManager) {
+            flixel::tweens::init();
+        }
+        flixel::tweens::globalManager->tweens.push_back(tween);
+    };
+
+    for (const auto& strumline : strumlines) {
+        if (strumline == "playerStrumline") {
+            applySpeed(&playerScrollSpeed);
+        } else if (strumline == "opponentStrumline") {
+            applySpeed(&opponentScrollSpeed);
+        }
+    }
+}
+
+float PlayState::getScrollSpeedForMustPress(bool mustPress) {
+    return mustPress ? playerScrollSpeed : opponentScrollSpeed;
+}
+
 void PlayState::beatHit() {
     ScriptManager::getInstance()->callAll(ScriptCallback::ON_BEAT_HIT, {curBeat});
 
@@ -667,4 +734,8 @@ void PlayState::beatHit() {
     if (characterManager) {
         characterManager->beatHit(curBeat, curStep, SONG);
     }
-} 
+
+    if (stage) {
+        stage->beatHit(curBeat);
+    }
+}

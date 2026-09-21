@@ -302,8 +302,7 @@ void TitleState::beatHit() {
         createCoolText({"PORT BY"});
         break;
     case 11:
-        removeText();
-        createCoolText({"PHLXSK8R"});
+        createCoolText({"DOTFLA"});
         break;
     case 12:
         removeText();

@@ -14,8 +14,12 @@ public:
     void update(float elapsed);
     void beatHit(int beat);
     void focusOn(int charTarget, float xOff = 0.0f, float yOff = 0.0f);
-    void tweenZoom(float targetZoom, float durationSeconds = 0.0f, bool direct = true);
+    void focusOn(int charTarget, float xOff, float yOff, float durationSeconds,
+                 flixel::tweens::EaseFunction ease, bool classic = false);
+    void tweenZoom(float targetZoom, float durationSeconds = 0.0f, bool direct = true,
+                   flixel::tweens::EaseFunction ease = flixel::tweens::FlxEase::cubeOut);
     void setCameraBopRate(float rate)      { cameraBopRate = rate; }
+    void setCameraBopOffset(float offset)  { cameraBopOffset = offset; }
     void setCameraBopIntensity(float i)    { cameraBopIntensity = i; }
     flixel::FlxObject* getCamFollow() const { return camFollow; }
     float getDefaultZoom() const { return defaultCamZoom; }
@@ -38,5 +42,8 @@ private:
     bool  zoomTweenActive = false;
 
     float cameraBopRate      = 4.0f;
+    float cameraBopOffset    = 0.0f;
     float cameraBopIntensity = 1.0f;
+
+    void resolveFocusTarget(int charTarget, float xOff, float yOff, float& tx, float& ty) const;
 };

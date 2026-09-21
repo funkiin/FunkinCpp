@@ -20,11 +20,21 @@ void FlxAnimationController::addByIndices(const std::string& name, const std::ve
 }
 
 void FlxAnimationController::play(const std::string& name, bool force, int startFrame) {
+    play(name, force, false, startFrame);
+}
+
+void FlxAnimationController::play(const std::string& name, bool force, bool reversedParam, int startFrame) {
     auto it = animations.find(name);
     if (it != animations.end()) {
         if (force || current != name) {
             current = name;
-            currentFrame = startFrame;
+            reversed = reversedParam;
+            int maxFrame = static_cast<int>(it->second.frames.size());
+            if (maxFrame <= 0) {
+                currentFrame = 0;
+            } else {
+                currentFrame = std::clamp(startFrame, 0, maxFrame - 1);
+            }
             timer = 0.0f;
             finished = false;
             
@@ -52,10 +62,10 @@ void FlxAnimationController::update(float elapsed) {
         timer = std::fmod(timer, frameTime);
         
         int oldFrame = currentFrame;
-        currentFrame += framesToAdvance;
+        currentFrame += reversed ? -framesToAdvance : framesToAdvance;
         const int maxFrame = static_cast<int>(anim.frames.size());
         
-        if (currentFrame >= maxFrame) {
+        if (!reversed && currentFrame >= maxFrame) {
             if (anim.looped) {
                 currentFrame = currentFrame % maxFrame;
             } else {
@@ -67,6 +77,22 @@ void FlxAnimationController::update(float elapsed) {
                 }
                 if (finished) {
                     currentFrame = maxFrame - 1;
+                }
+            }
+        }
+        else if (reversed && currentFrame < 0) {
+            if (anim.looped) {
+                currentFrame %= maxFrame;
+                if (currentFrame < 0) currentFrame += maxFrame;
+            } else {
+                if (!finished) {
+                    finished = true;
+                    if (finishCallback) {
+                        finishCallback(current);
+                    }
+                }
+                if (finished) {
+                    currentFrame = 0;
                 }
             }
         }

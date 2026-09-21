@@ -20,6 +20,7 @@ public:
     bool debugMode;
     bool stunned;
     float holdTimer;
+    float danceEvery;
     
     int healthColorR;
     int healthColorG;
@@ -35,4 +36,3 @@ private:
     void setupGF();
     void setupDad();
 };
-

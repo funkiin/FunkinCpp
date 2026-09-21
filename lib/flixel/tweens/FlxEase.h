@@ -40,6 +40,21 @@ public:
     static inline float cubeInOut(float t) {
         return t <= 0.5f ? t * t * t * 4.0f : 1.0f + (--t) * t * t * 4.0f;
     }
+
+    static inline float quartIn(float t) {
+        return t * t * t * t;
+    }
+
+    static inline float quartOut(float t) {
+        t -= 1.0f;
+        return 1.0f - t * t * t * t;
+    }
+
+    static inline float quartInOut(float t) {
+        if (t < 0.5f) return 8.0f * t * t * t * t;
+        t -= 1.0f;
+        return 1.0f - 8.0f * t * t * t * t;
+    }
     
     static inline float quintIn(float t) {
         return t * t * t * t * t;
@@ -139,6 +154,32 @@ public:
         if (t < 1.0f) return t * t * (2.70158f * t - 1.70158f) / 2.0f;
         t--;
         return (1.0f - (--t) * t * (-2.70158f * t - 1.70158f)) / 2.0f + 0.5f;
+    }
+
+    static inline float smoothStepInOut(float t) {
+        return t * t * (3.0f - 2.0f * t);
+    }
+
+    static inline float smoothStepIn(float t) {
+        return smoothStepInOut(t) * t;
+    }
+
+    static inline float smoothStepOut(float t) {
+        float inv = 1.0f - t;
+        return 1.0f - smoothStepInOut(inv) * inv;
+    }
+
+    static inline float smootherStepInOut(float t) {
+        return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
+    }
+
+    static inline float smootherStepIn(float t) {
+        return smootherStepInOut(t) * t;
+    }
+
+    static inline float smootherStepOut(float t) {
+        float inv = 1.0f - t;
+        return 1.0f - smootherStepInOut(inv) * inv;
     }
     
     static inline float elasticIn(float t) {

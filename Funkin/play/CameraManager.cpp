@@ -57,8 +57,14 @@ void CameraManager::update(float elapsed) {
 void CameraManager::beatHit(int beat) {
     if (!camZooming || !camGame) return;
 
-    int rate = static_cast<int>(std::max(1.0f, cameraBopRate));
-    if (beat % rate == 0) {
+    if (cameraBopRate <= 0.0f) return;
+
+    float phase = std::fmod(static_cast<float>(beat) - cameraBopOffset, cameraBopRate);
+    if (phase < 0.0f) {
+        phase += cameraBopRate;
+    }
+
+    if (phase < 0.001f || std::fabs(phase - cameraBopRate) < 0.001f) {
         camGame->zoom += cameraBopIntensity * 0.015f;
         if (camHUD) {
             camHUD->zoom += cameraBopIntensity * 0.03f;
@@ -66,12 +72,9 @@ void CameraManager::beatHit(int beat) {
     }
 }
 
-void CameraManager::focusOn(int charTarget, float xOff, float yOff) {
-    if (!camFollow) return;
-
-    float tx = xOff;
-    float ty = yOff;
-
+void CameraManager::resolveFocusTarget(int charTarget, float xOff, float yOff, float& tx, float& ty) const {
+    tx = xOff;
+    ty = yOff;
     switch (charTarget) {
         case 0: // bf
             if (boyfriend) {
@@ -95,11 +98,48 @@ void CameraManager::focusOn(int charTarget, float xOff, float yOff) {
         default:
             break;
     }
+}
+
+void CameraManager::focusOn(int charTarget, float xOff, float yOff) {
+    if (!camFollow) return;
+
+    float tx = 0.0f;
+    float ty = 0.0f;
+    resolveFocusTarget(charTarget, xOff, yOff, tx, ty);
 
     camFollow->setPosition(tx, ty);
 }
 
-void CameraManager::tweenZoom(float targetZoom, float durationSeconds, bool direct) {
+void CameraManager::focusOn(int charTarget, float xOff, float yOff, float durationSeconds,
+                            flixel::tweens::EaseFunction ease, bool classic) {
+    if (!camFollow) return;
+
+    float tx = 0.0f;
+    float ty = 0.0f;
+    resolveFocusTarget(charTarget, xOff, yOff, tx, ty);
+
+    flixel::tweens::cancelTweensOf(camFollow);
+
+    if (classic || durationSeconds <= 0.0f) {
+        camFollow->setPosition(tx, ty);
+        return;
+    }
+
+    auto* t = new flixel::tweens::VarTween(durationSeconds);
+    t->object = camFollow;
+    t->ease = ease ? ease : flixel::tweens::FlxEase::linear;
+    t->addProperty("x", &camFollow->x, tx);
+    t->addProperty("y", &camFollow->y, ty);
+    t->start();
+
+    if (!flixel::tweens::globalManager) {
+        flixel::tweens::init();
+    }
+    flixel::tweens::globalManager->tweens.push_back(t);
+}
+
+void CameraManager::tweenZoom(float targetZoom, float durationSeconds, bool direct,
+                              flixel::tweens::EaseFunction ease) {
     if (!direct) {
         targetZoom = defaultCamZoom * targetZoom;
     }
@@ -117,14 +157,15 @@ void CameraManager::tweenZoom(float targetZoom, float durationSeconds, bool dire
 
     auto* t = new flixel::tweens::VarTween(durationSeconds);
     t->object = camGame;
-    t->ease   = flixel::tweens::FlxEase::cubeOut;
+    t->ease   = ease ? ease : flixel::tweens::FlxEase::linear;
     t->addProperty("zoom", &camGame->zoom, targetZoom);
     t->onComplete = [this]() { zoomTweenActive = false; };
     t->start();
 
-    if (flixel::tweens::globalManager) {
-        flixel::tweens::globalManager->tweens.push_back(t);
+    if (!flixel::tweens::globalManager) {
+        flixel::tweens::init();
     }
+    flixel::tweens::globalManager->tweens.push_back(t);
 
     zoomTweenActive = true;
 }

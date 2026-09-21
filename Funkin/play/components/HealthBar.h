@@ -13,6 +13,11 @@ public:
     float getHealth() const { return health; }
     
     void setIcons(const std::string& player, const std::string& opponent);
+    void configureIcon(int character, const std::string& iconId, bool shouldBop = true,
+                       float scale = 1.0f, bool flipX = false,
+                       bool isPixel = false, float offsetX = 0.0f, float offsetY = 0.0f);
+    HealthIcon* getPlayerIcon() const { return iconP1; }
+    HealthIcon* getOpponentIcon() const { return iconP2; }
     void setColors(int player1R, int player1G, int player1B, int player2R, int player2G, int player2B);
     void update(float elapsed);
     void draw();

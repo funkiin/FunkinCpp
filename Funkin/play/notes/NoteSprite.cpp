@@ -194,7 +194,7 @@ void NoteSprite::draw() {
     
     if (sustainLength <= 0 || bodyFrameIndex < 0 || tailFrameIndex < 0) return;
     
-    float scrollSpeed = PlayState::SONG.speed;
+    float scrollSpeed = PlayState::getScrollSpeedForMustPress(mustPress);
     float fullHoldLength = sustainLength * 0.45f * scrollSpeed;
     
     const auto& bodyFrame = noteFrames->frames[bodyFrameIndex];
@@ -284,7 +284,7 @@ void NoteSprite::update(float elapsed) {
     }
 
     float songPos = Conductor::songPosition;
-    float scrollSpeed = PlayState::SONG.speed;
+    float scrollSpeed = PlayState::getScrollSpeedForMustPress(mustPress);
     
     float targetY = getTargetY();
     

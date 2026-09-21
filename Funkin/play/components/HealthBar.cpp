@@ -60,6 +60,23 @@ void HealthBar::setIcons(const std::string& player, const std::string& opponent)
     if (camera) iconP2->camera = camera;
 }
 
+void HealthBar::configureIcon(int character, const std::string& iconId, bool shouldBop,
+                              float scale, bool flipX, bool isPixel, float offsetX, float offsetY) {
+    HealthIcon* icon = nullptr;
+    if (character == 0) {
+        icon = iconP1;
+    } else if (character == 1) {
+        icon = iconP2;
+    }
+
+    if (icon) {
+        icon->configure(iconId, shouldBop, scale, flipX, isPixel, offsetX, offsetY);
+        if (camera) {
+            icon->camera = camera;
+        }
+    }
+}
+
 void HealthBar::setColors(int player1R, int player1G, int player1B, int player2R, int player2G, int player2B) {
     if (greenBar) {
         greenBar->makeGraphic(593, 11, {static_cast<uint8_t>(player1R), static_cast<uint8_t>(player1G), static_cast<uint8_t>(player1B), 255});
