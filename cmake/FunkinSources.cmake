@@ -47,6 +47,11 @@ set(FUNKIN_SOURCES
     Funkin/ui/StoryMenuState.cpp
     Funkin/ui/TitleState.cpp
     lib/tinyxml2/tinyxml2.cpp
+    lib/SDLAnimate/SDL2/SDLAnimate.cpp
+    lib/SDLAnimate/SDL2/SDLAnimateAssets.cpp
+    lib/SDLAnimate/SDL2/SDLAnimateController.cpp
+    lib/SDLAnimate/SDL2/SDLAnimateFrames.cpp
+    lib/SDLAnimate/SDL2/SDLAnimateJson.cpp
     lib/flixel/addons/transition/FlxTransitionEffect.cpp
     lib/flixel/addons/FlxBackdrop.cpp
     lib/flixel/animation/FlxAnimationController.cpp

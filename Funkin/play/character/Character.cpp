@@ -1,12 +1,85 @@
 #include "Character.h"
+#include <SDLAnimate/SDL2/SDLAnimateAssets.h>
+#include <flixel/FlxG.h>
 #include <flixel/graphics/frames/FlxAtlasFrames.h>
 #include "../song/Conductor.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <filesystem>
 
 using json = nlohmann::json;
+namespace fs = std::filesystem;
+
+namespace {
+
+bool fileExists(const std::string& path) {
+    std::error_code ec;
+    return fs::exists(path, ec);
+}
+
+std::string readTextFile(const std::string& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file.is_open()) {
+        return "";
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+std::string normalizeAssetPath(const std::string& assetPath) {
+    if (assetPath.empty()) {
+        return "";
+    }
+
+    const std::string assetRoot = ASSETS_PATH;
+    if (assetPath.front() == '/' || (!assetRoot.empty() && assetPath.rfind(assetRoot, 0) == 0)) {
+        return assetPath;
+    }
+
+    size_t colon = assetPath.find(':');
+    if (colon != std::string::npos) {
+        std::string library = assetPath.substr(0, colon);
+        std::string local = assetPath.substr(colon + 1);
+        return std::string(ASSETS_PATH) + "assets/" + library + "/images/" + local;
+    }
+
+    if (assetPath.rfind("assets/", 0) == 0) {
+        return std::string(ASSETS_PATH) + assetPath;
+    }
+
+    return std::string(ASSETS_PATH) + "assets/images/" + assetPath;
+}
+
+std::string findCharacterDataPath(const std::string& character) {
+    std::vector<std::string> candidates = {
+        std::string(ASSETS_PATH) + "assets/preload/data/characters/" + character + ".json",
+        std::string(ASSETS_PATH) + "assets/data/characters/" + character + ".json"
+    };
+
+    for (const std::string& path : candidates) {
+        if (fileExists(path)) {
+            return path;
+        }
+    }
+    return "";
+}
+
+bool jsonBool(const json& value, const std::string& modernKey, const std::string& legacyKey, bool fallback) {
+    if (value.contains(modernKey)) return value[modernKey].get<bool>();
+    if (value.contains(legacyKey)) return value[legacyKey].get<bool>();
+    return fallback;
+}
+
+std::vector<int> jsonIndices(const json& value) {
+    if (value.contains("frameIndices")) return value["frameIndices"].get<std::vector<int>>();
+    if (value.contains("indices")) return value["indices"].get<std::vector<int>>();
+    return {};
+}
+
+} // namespace
 
 Character::Character(float x, float y, const std::string& character, bool isPlayer)
     : FlxSprite(x, y)
@@ -52,7 +125,11 @@ void Character::loadCharacter() {
 }
 
 bool Character::loadFromJSON(const std::string& character) {
-    std::string jsonPath = ASSETS_PATH "assets/data/characters/" + character + ".json";
+    std::string jsonPath = findCharacterDataPath(character);
+    if (jsonPath.empty()) {
+        return false;
+    }
+
     std::ifstream file(jsonPath);
     
     if (!file.is_open()) {
@@ -64,81 +141,30 @@ bool Character::loadFromJSON(const std::string& character) {
         file >> charData;
         file.close();
         
-        //std::string assetPath = charData.value("assetPath", ASSETS_PATH "assets/images/chars/BOYFRIEND");
-        std::string assetPath = std::string(ASSETS_PATH) + charData.value("assetPath", "assets/images/chars/BOYFRIEND");
-        std::string xmlPath = assetPath + ".xml";
-        std::string pngPath = assetPath + ".png";
-        
-        std::ifstream xmlFile(xmlPath);
-        if (!xmlFile.is_open()) {
-            std::cerr << "Failed to load character XML: " << xmlPath << std::endl;
+        std::string assetPath = normalizeAssetPath(charData.value("assetPath", "assets/images/chars/BOYFRIEND"));
+        std::string renderType = charData.value("renderType", "");
+        bool wantsAnimate = renderType.find("animateatlas") != std::string::npos ||
+                            fileExists(assetPath + "/Animation.json");
+
+        bool loaded = wantsAnimate
+            ? loadAnimateCharacter(charData, assetPath)
+            : loadSparrowCharacter(charData, assetPath);
+
+        if (!loaded) {
+            std::cerr << "Failed to load character assets for: " << character << std::endl;
             return false;
         }
-        
-        std::stringstream buffer;
-        buffer << xmlFile.rdbuf();
-        std::string xmlText = buffer.str();
-        xmlFile.close();
-        
-        auto tex = flixel::graphics::frames::FlxAtlasFrames::fromSparrow(pngPath, xmlText);
-        frames = tex;
-        
-        if (frames && !frames->frames.empty()) {
-            const auto& firstFrame = frames->frames[0];
-            frameWidth = firstFrame.sourceSize.w;
-            frameHeight = firstFrame.sourceSize.h;
-            width = static_cast<float>(frameWidth);
-            height = static_cast<float>(frameHeight);
-        }
-        
-        texture = tex->texture;
-        ownsTexture = false;
-        animation = new flixel::animation::FlxAnimationController();
-        
-        if (charData.contains("animations")) {
-            for (const auto& anim : charData["animations"]) {
-                std::string animName = anim.value("name", "");
-                std::string prefix = anim.value("prefix", "");
-                int frameRate = anim.value("frameRate", 24);
-                bool loop = anim.value("loop", false);
-                
-                if (anim.contains("indices")) {
-                    std::vector<int> indices = anim["indices"].get<std::vector<int>>();
-                    auto animFrames = frames->getFramesByPrefix(prefix);
-                    if (!animFrames.empty()) {
-                        animation->addByIndices(animName, animFrames, indices, frameRate, loop);
-                    }
-                } else {
-                    auto animFrames = frames->getFramesByPrefix(prefix);
-                    if (!animFrames.empty()) {
-                        animation->addByPrefix(animName, animFrames, frameRate, loop);
-                    }
-                }
-                
-                if (anim.contains("offsets") && anim["offsets"].is_array() && anim["offsets"].size() >= 2) {
-                    float offsetX = anim["offsets"][0].get<float>();
-                    float offsetY = anim["offsets"][1].get<float>();
-                    addOffset(animName, offsetX, offsetY);
-                }
-            }
-        }
-        
+
         if (charData.contains("flipX")) {
             flipX = charData["flipX"].get<bool>();
         }
-        
-        if (charData.contains("scale")) {
-            float scaleVal = charData["scale"].get<float>();
-            scale.set(scaleVal, scaleVal);
+
+        if (charData.contains("offsets") && charData["offsets"].is_array() && charData["offsets"].size() >= 2) {
+            baseOffsetX = charData["offsets"][0].get<float>();
+            baseOffsetY = charData["offsets"][1].get<float>();
         }
         
-        if (charData.contains("healthColor") && charData["healthColor"].is_array() && charData["healthColor"].size() >= 3) {
-            healthColorR = charData["healthColor"][0].get<int>();
-            healthColorG = charData["healthColor"][1].get<int>();
-            healthColorB = charData["healthColor"][2].get<int>();
-        }
-        
-        std::string startAnim = charData.value("startingAnimation", "idle");
+        std::string startAnim = charData.value("startingAnimation", usesAnimateAtlas && curCharacter == "gf" ? "danceRight" : "idle");
         playAnim(startAnim);
         
         std::cout << "Loaded character from JSON: " << character << std::endl;
@@ -149,6 +175,154 @@ bool Character::loadFromJSON(const std::string& character) {
         file.close();
         return false;
     }
+}
+
+bool Character::loadAnimateCharacter(const json& charData, const std::string& assetPath) {
+    SDLAnimate::FlxAnimateAssets::setRenderer(flixel::FlxG::renderer);
+    SDLAnimate::FlxAnimateAssets::setAssetRoot(ASSETS_PATH);
+
+    animateSprite = std::make_unique<SDLAnimate::FlxAnimate>(x, y);
+    animateSprite->setRenderer(flixel::FlxG::renderer);
+    if (!animateSprite->loadAnimate(assetPath)) {
+        animateSprite.reset();
+        return false;
+    }
+
+    usesAnimateAtlas = true;
+    baseAssetPath = assetPath;
+    animation = nullptr;
+    texture = nullptr;
+    frames = nullptr;
+    frameWidth = animateSprite->frameWidth;
+    frameHeight = animateSprite->frameHeight;
+    width = animateSprite->width;
+    height = animateSprite->height;
+    centerOrigin();
+
+    if (charData.contains("animations")) {
+        for (const auto& animData : charData["animations"]) {
+            std::string animName = animData.value("name", "");
+            std::string prefix = animData.value("prefix", "");
+            if (animName.empty() || prefix.empty()) {
+                continue;
+            }
+
+            std::string animAssetPath = normalizeAssetPath(animData.value("assetPath", charData.value("assetPath", "")));
+            if (!animAssetPath.empty() && animAssetPath != baseAssetPath && fileExists(animAssetPath + "/Animation.json")) {
+                auto extra = SDLAnimate::FlxAnimateFrames::fromAnimate(animAssetPath);
+                if (extra && animateSprite->library) {
+                    animateSprite->library->mergeFrom(*extra);
+                }
+            }
+
+            float frameRate = animData.value("frameRate", 0.0f);
+            bool loop = jsonBool(animData, "looped", "loop", false);
+            std::vector<int> indices = jsonIndices(animData);
+            std::string animType = animData.value("animType", "");
+
+            if (animType == "symbol") {
+                if (!indices.empty()) {
+                    animateSprite->anim.addBySymbolIndices(animName, prefix, indices, frameRate, loop);
+                } else {
+                    animateSprite->anim.addBySymbol(animName, prefix, frameRate, loop);
+                }
+            } else {
+                if (!indices.empty()) {
+                    animateSprite->anim.addByFrameLabelIndices(animName, prefix, indices, frameRate, loop);
+                } else {
+                    animateSprite->anim.addByFrameLabel(animName, prefix, frameRate, loop);
+                }
+            }
+
+            if (animData.contains("offsets") && animData["offsets"].is_array() && animData["offsets"].size() >= 2) {
+                addOffset(animName, animData["offsets"][0].get<float>(), animData["offsets"][1].get<float>());
+            }
+        }
+    }
+
+    if (charData.contains("scale")) {
+        float scaleVal = charData["scale"].get<float>();
+        scale.set(scaleVal, scaleVal);
+    }
+
+    if (charData.contains("healthColor") && charData["healthColor"].is_array() && charData["healthColor"].size() >= 3) {
+        healthColorR = charData["healthColor"][0].get<int>();
+        healthColorG = charData["healthColor"][1].get<int>();
+        healthColorB = charData["healthColor"][2].get<int>();
+    }
+
+    return true;
+}
+
+bool Character::loadSparrowCharacter(const json& charData, const std::string& assetPath) {
+    std::string xmlPath = assetPath + ".xml";
+    std::string pngPath = assetPath + ".png";
+
+    std::string xmlText = readTextFile(xmlPath);
+    if (xmlText.empty()) {
+        std::cerr << "Failed to load character XML: " << xmlPath << std::endl;
+        return false;
+    }
+
+    auto tex = flixel::graphics::frames::FlxAtlasFrames::fromSparrow(pngPath, xmlText);
+    if (!tex) {
+        return false;
+    }
+
+    frames = tex;
+
+    if (frames && !frames->frames.empty()) {
+        const auto& firstFrame = frames->frames[0];
+        frameWidth = firstFrame.sourceSize.w;
+        frameHeight = firstFrame.sourceSize.h;
+        width = static_cast<float>(frameWidth);
+        height = static_cast<float>(frameHeight);
+    }
+
+    texture = tex->texture;
+    ownsTexture = false;
+    animation = new flixel::animation::FlxAnimationController();
+    usesAnimateAtlas = false;
+
+    if (charData.contains("animations")) {
+        for (const auto& animData : charData["animations"]) {
+            std::string animName = animData.value("name", "");
+            std::string prefix = animData.value("prefix", "");
+            int frameRate = animData.value("frameRate", 24);
+            bool loop = jsonBool(animData, "looped", "loop", false);
+
+            if (!frames || animName.empty() || prefix.empty()) {
+                continue;
+            }
+
+            auto animFrames = frames->getFramesByPrefix(prefix);
+            if (!animFrames.empty()) {
+                std::vector<int> indices = jsonIndices(animData);
+                if (!indices.empty()) {
+                    animation->addByIndices(animName, animFrames, indices, frameRate, loop);
+                } else {
+                    animation->addByPrefix(animName, animFrames, frameRate, loop);
+                }
+            }
+
+            if (animData.contains("offsets") && animData["offsets"].is_array() && animData["offsets"].size() >= 2) {
+                addOffset(animName, animData["offsets"][0].get<float>(), animData["offsets"][1].get<float>());
+            }
+        }
+    }
+        
+    if (charData.contains("scale")) {
+        float scaleVal = charData["scale"].get<float>();
+        scale.set(scaleVal, scaleVal);
+    }
+        
+    if (charData.contains("healthColor") && charData["healthColor"].is_array() && charData["healthColor"].size() >= 3) {
+        healthColorR = charData["healthColor"][0].get<int>();
+        healthColorG = charData["healthColor"][1].get<int>();
+        healthColorB = charData["healthColor"][2].get<int>();
+    }
+
+    return true;
 }
 
 void Character::setupBF() {
@@ -345,7 +519,11 @@ void Character::setupDad() {
 }
 
 void Character::update(float elapsed) {
-    FlxSprite::update(elapsed);
+    flixel::FlxSprite::update(elapsed);
+    if (usesAnimateAtlas && animateSprite) {
+        syncAnimateSprite();
+        animateSprite->update(elapsed);
+    }
     
     if (animation) {
         animation->update(elapsed);
@@ -365,8 +543,8 @@ void Character::update(float elapsed) {
     if (curCharacter.rfind("bf", 0) == 0) {
         holdTimer += elapsed;
         
-        if (holdTimer >= Conductor::stepCrochet * 4 * 0.001f && animation) {
-            std::string currentAnim = animation->current;
+        if (holdTimer >= Conductor::stepCrochet * 4 * 0.001f) {
+            std::string currentAnim = getCurrentAnimName();
             bool shouldReturnToIdle = (currentAnim.rfind("sing", 0) == 0) || 
                                      (currentAnim == "hey") || 
                                      (currentAnim == "scared");
@@ -376,7 +554,7 @@ void Character::update(float elapsed) {
             }
         }
     } else {
-        if (animation && animation->current.rfind("sing", 0) == 0) {
+        if (getCurrentAnimName().rfind("sing", 0) == 0) {
             holdTimer += elapsed;
             
             float dadVar = 4.0f;
@@ -389,6 +567,42 @@ void Character::update(float elapsed) {
                 holdTimer = 0.0f;
             }
         }
+    }
+}
+
+void Character::draw() {
+    if (usesAnimateAtlas && animateSprite) {
+        syncAnimateSprite();
+        animateSprite->draw();
+        return;
+    }
+    flixel::FlxSprite::draw();
+}
+
+void Character::syncAnimateSprite() {
+    if (!animateSprite) {
+        return;
+    }
+
+    animateSprite->setRenderer(flixel::FlxG::renderer);
+    animateSprite->x = x;
+    animateSprite->y = y;
+    animateSprite->angle = angle;
+    animateSprite->alpha = alpha;
+    animateSprite->offsetX = offsetX;
+    animateSprite->offsetY = offsetY;
+    animateSprite->originX = originX;
+    animateSprite->originY = originY;
+    animateSprite->visible = visible;
+    animateSprite->active = active;
+    animateSprite->flipX = flipX;
+    animateSprite->flipY = flipY;
+    animateSprite->scale = {scale.x, scale.y};
+    animateSprite->scrollFactor = {scrollFactor.x, scrollFactor.y};
+    if (camera) {
+        animateSprite->setCamera(camera->scroll.x, camera->scroll.y, camera->zoom);
+    } else {
+        animateSprite->setCamera(0.0f, 0.0f, 1.0f);
     }
 }
 
@@ -408,6 +622,45 @@ void Character::dance() {
 }
 
 void Character::playAnim(const std::string& animName, bool force, bool reversed, int frame) {
+    if (usesAnimateAtlas) {
+        if (!force) {
+            std::string currentAnim = getCurrentAnimName();
+            bool isSpecialAnim = (currentAnim == "hey" || currentAnim == "scared");
+            
+            if (isSpecialAnim && holdTimer < Conductor::stepCrochet * 4 * 0.001f) {
+                return;
+            }
+        }
+
+        if (animateSprite) {
+            animateSprite->anim.play(animName, force, reversed, frame);
+        }
+        
+        if (animOffsets.find(animName) != animOffsets.end()) {
+            auto& offset = animOffsets[animName];
+            offsetX = baseOffsetX + offset[0];
+            offsetY = baseOffsetY + offset[1];
+        } else {
+            offsetX = baseOffsetX;
+            offsetY = baseOffsetY;
+        }
+        
+        holdTimer = 0.0f;
+        
+        if (curCharacter == "gf") {
+            if (animName == "singLEFT") {
+                danced = true;
+            } else if (animName == "singRIGHT") {
+                danced = false;
+            }
+            
+            if (animName == "singUP" || animName == "singDOWN") {
+                danced = !danced;
+            }
+        }
+        return;
+    }
+
     if (animation) {
         if (!force) {
             std::string currentAnim = animation->current;
@@ -418,15 +671,15 @@ void Character::playAnim(const std::string& animName, bool force, bool reversed,
             }
         }
         
-        animation->play(animName, force);
+        animation->play(animName, force, reversed, frame);
         
         if (animOffsets.find(animName) != animOffsets.end()) {
             auto& offset = animOffsets[animName];
-            offsetX = offset[0];
-            offsetY = offset[1];
+            offsetX = baseOffsetX + offset[0];
+            offsetY = baseOffsetY + offset[1];
         } else {
-            offsetX = 0;
-            offsetY = 0;
+            offsetX = baseOffsetX;
+            offsetY = baseOffsetY;
         }
         
         holdTimer = 0.0f;
@@ -447,4 +700,33 @@ void Character::playAnim(const std::string& animName, bool force, bool reversed,
 
 void Character::addOffset(const std::string& name, float x, float y) {
     animOffsets[name] = {x, y};
+}
+
+std::string Character::getCurrentAnimName() const {
+    if (usesAnimateAtlas) {
+        const SDLAnimate::Animation* current = animateSprite ? animateSprite->anim.current() : nullptr;
+        return current ? current->name : "";
+    }
+    return animation ? animation->current : "";
+}
+
+int Character::getCurrentAnimFrame() const {
+    if (usesAnimateAtlas) {
+        return animateSprite ? animateSprite->anim.framePosition() : 0;
+    }
+    return animation ? animation->currentFrame : 0;
+}
+
+bool Character::isCurrentAnimFinished() const {
+    if (usesAnimateAtlas) {
+        return animateSprite ? animateSprite->anim.finished() : true;
+    }
+    return animation ? animation->finished : true;
+}
+
+bool Character::hasAnimation(const std::string& animName) const {
+    if (usesAnimateAtlas) {
+        return animateSprite && animateSprite->anim.has(animName);
+    }
+    return animation && animation->animations.find(animName) != animation->animations.end();
 }
