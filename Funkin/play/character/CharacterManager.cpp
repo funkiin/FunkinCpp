@@ -30,9 +30,9 @@ void CharacterManager::beatHit(int curBeat, int curStep, const SwagSong& song) {
     };
 
     auto canIdleDance = [](Character* character) {
-        if (!character || !character->animation) return false;
+        if (!character) return false;
 
-        std::string currentAnim = character->animation->current;
+        std::string currentAnim = character->getCurrentAnimName();
         bool isSinging = currentAnim.rfind("sing", 0) == 0;
         bool isSpecialAnim = currentAnim == "hey" || currentAnim == "scared" ||
                              currentAnim == "firstDeath" || currentAnim == "deathLoop" ||

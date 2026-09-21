@@ -97,14 +97,14 @@ void GameOverSubState::update(float elapsed) {
         }
     }
     
-    if (bf && bf->animation) {
-        if (bf->animation->current == "firstDeath" && bf->animation->currentFrame == 12) {
+    if (bf) {
+        if (bf->getCurrentAnimName() == "firstDeath" && bf->getCurrentAnimFrame() == 12) {
             if (gameCamera && camFollow) {
                 gameCamera->follow(camFollow, flixel::FlxCameraFollowStyle::LOCKON, 0.01f);
             }
         }
         
-        if (bf->animation->current == "firstDeath" && bf->animation->finished) {
+        if (bf->getCurrentAnimName() == "firstDeath" && bf->isCurrentAnimFinished()) {
             if (!gameOverMusic) {
                 gameOverMusic = new flixel::FlxSound();
                 if (gameOverMusic->loadStream(ASSETS_PATH "assets/music/gameOver.ogg", true)) {

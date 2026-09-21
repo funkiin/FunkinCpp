@@ -122,7 +122,7 @@ void NoteHitHandler::handleInput() {
                             case 2: animToPlay = "singUP"; break;
                             case 3: animToPlay = "singRIGHT"; break;
                         }
-                        if (!animToPlay.empty() && boyfriend->animation) {
+                        if (!animToPlay.empty()) {
                             boyfriend->holdTimer = 0.0f;
                             boyfriend->playAnim(animToPlay, true);
                         }
