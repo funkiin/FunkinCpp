@@ -23,3 +23,6 @@
 [submodule "lib/tsukiyo"]
 	path = lib/tsukiyo
 	url = https://github.com/Moon4K-Dev/Tsukiyo
+[submodule "lib/SDLAnimate"]
+	path = lib/SDLAnimate
+	url = https://github.com/funkiin/SDLAnimate
